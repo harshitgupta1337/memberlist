@@ -141,6 +141,7 @@ type alive struct {
 	Addr        []byte
 	Port        uint16
 	Meta        []byte
+    IsClient    bool
 
 	// The versions of the protocol/delegate that are being spoken, order:
 	// pmin, pmax, pcur, dmin, dmax, dcur
@@ -178,6 +179,7 @@ type pushNodeState struct {
 	Incarnation uint32
 	State       NodeStateType
 	Vsn         []uint8 // Protocol versions
+    IsClient    bool
 }
 
 // compress is used to wrap an underlying payload
@@ -935,6 +937,7 @@ func (m *Memberlist) sendLocalState(conn net.Conn, join bool) error {
 			n.PMin, n.PMax, n.PCur,
 			n.DMin, n.DMax, n.DCur,
 		}
+        localNodes[idx].IsClient = n.IsClient
 	}
 	m.nodeLock.RUnlock()
 
@@ -1159,6 +1162,7 @@ func (m *Memberlist) mergeRemoteState(join bool, remoteNodes []pushNodeState, us
 				DMin:  n.Vsn[3],
 				DMax:  n.Vsn[4],
 				DCur:  n.Vsn[5],
+                IsClient: n.IsClient,
 			}
 		}
 		if err := m.config.Merge.NotifyMerge(nodes); err != nil {

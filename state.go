@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+    //"runtime/debug"
 
 	metrics "github.com/armon/go-metrics"
 )
@@ -35,6 +36,7 @@ type Node struct {
 	DMin  uint8         // Min protocol version for the delegate to understand
 	DMax  uint8         // Max protocol version for the delegate to understand
 	DCur  uint8         // Current version delegate is speaking
+    IsClient bool
 }
 
 // Address returns the host:port form of a node's address, suitable for use
@@ -241,7 +243,9 @@ START:
 		skip = true
 	} else if node.DeadOrLeft() {
 		skip = true
-	}
+	//} else if node.IsClient {
+    //    skip = true
+    }
 
 	// Potentially skip
 	m.nodeLock.RUnlock()
@@ -300,6 +304,8 @@ func (m *Memberlist) probeNode(node *nodeState) {
 		SourcePort: selfPort,
 		SourceNode: m.config.Name,
 	}
+
+    //debug.PrintStack()
 	ackCh := make(chan ackMessage, m.config.IndirectChecks+1)
 	nackCh := make(chan struct{}, m.config.IndirectChecks+1)
 	m.setProbeChannels(ping.SeqNo, ackCh, nackCh, probeInterval)
@@ -511,6 +517,8 @@ func (m *Memberlist) Ping(node string, addr net.Addr) (time.Duration, error) {
 	m.setProbeChannels(ping.SeqNo, ackCh, nil, m.config.ProbeInterval)
 
 	a := Address{Addr: addr.String(), Name: node}
+
+    fmt.Printf("Sending PING to %s\n", node)
 
 	// Send a ping to the node.
 	if err := m.encodeAndSendMsg(a, pingMsg, &ping); err != nil {
@@ -899,11 +907,13 @@ func (m *Memberlist) refute(me *nodeState, accusedInc uint32) {
 
 	// Format and broadcast an alive message.
 	a := alive{
+        // TODO Check all ionstantiations of alive
 		Incarnation: inc,
 		Node:        me.Name,
 		Addr:        me.Addr,
 		Port:        me.Port,
 		Meta:        me.Meta,
+        IsClient:    me.IsClient,
 		Vsn: []uint8{
 			me.PMin, me.PMax, me.PCur,
 			me.DMin, me.DMax, me.DCur,
@@ -918,6 +928,8 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}, bootstrap bool) {
 	m.nodeLock.Lock()
 	defer m.nodeLock.Unlock()
 	state, ok := m.nodeMap[a.Node]
+
+    //debug.PrintStack()
 
 	// It is possible that during a Leave(), there is already an aliveMsg
 	// in-queue to be processed but blocked by the locks above. If we let
@@ -981,6 +993,7 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}, bootstrap bool) {
 				Addr: a.Addr,
 				Port: a.Port,
 				Meta: a.Meta,
+                IsClient: a.IsClient,
 			},
 			State: StateDead,
 		}
@@ -1004,6 +1017,8 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}, bootstrap bool) {
 		offset := randomOffset(n)
 
 		// Add at the end and swap with the node at the offset
+        fmt.Printf("Adding node to nodoes %s IsClient = %t\n", a.Node, state.Node.IsClient)
+
 		m.nodes = append(m.nodes, state)
 		m.nodes[offset], m.nodes[n] = m.nodes[n], m.nodes[offset]
 
@@ -1291,6 +1306,7 @@ func (m *Memberlist) mergeState(remote []pushNodeState) {
 				Port:        r.Port,
 				Meta:        r.Meta,
 				Vsn:         r.Vsn,
+                IsClient:    r.IsClient,
 			}
 			m.aliveNode(&a, nil, false)
 

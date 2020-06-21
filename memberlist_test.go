@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	iretry "github.com/hashicorp/memberlist/internal/retry"
+	iretry "github.com/harshitgupta1337/memberlist/internal/retry"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/require"
 )

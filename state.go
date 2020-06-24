@@ -243,8 +243,8 @@ START:
 		skip = true
 	} else if node.DeadOrLeft() {
 		skip = true
-	//} else if node.IsClient {
-    //    skip = true
+	} else if node.IsClient {
+        skip = true
     }
 
 	// Potentially skip
